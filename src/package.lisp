@@ -20,6 +20,7 @@
            #:make-ssl-client-stream
            #:*make-ssl-client-stream-verify-default*
            #:make-ssl-server-stream
+           #:*default-unwrap-stream-p*
            #:use-certificate-chain-file
            #:random-bytes
            ;; DEPRECATED.
@@ -69,4 +70,7 @@
            #:certificate-fingerprint
 
            ;; hostname-verification
-           #:verify-hostname))
+           #:verify-hostname)
+  (:import-from :cl+ssl/config
+                #:libssl
+                #:libcrypto))

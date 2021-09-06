@@ -96,9 +96,10 @@ install:
   - |
     if [ ! -f "test/run-on-many-lisps-and-openssls/openssl-releases/bin/$OPENSSL-${BITS}bit/lib/libcrypto.so" ] || [ ! -f "test/run-on-many-lisps-and-openssls/openssl-releases/bin/$OPENSSL-${BITS}bit/lib/libssl.so" ]
     then
+      echo Building OpenSSL binaries for "$OPENSSL" "$BITS"bit.
       test/run-on-many-lisps-and-openssls/openssl-releases/fetch.sh "$OPENSSL"
       if [ $BITS = 32 ]; then sudo apt-get install libc6-dev-i386 gcc-multilib; fi
-      rm -rf test/run-on-many-lisps-and-openssls/openssl-releases/bin/
+      rm -rf test/run-on-many-lisps-and-openssls/openssl-releases/bin/$OPENSSL-${BITS}bit/
       test/run-on-many-lisps-and-openssls/openssl-releases/build.sh "$OPENSSL" "$BITS" > openssl-build.log
     else
       echo Found cached OpenSSL binaries
@@ -111,67 +112,11 @@ cache:
 #      - $HOME/.config/common-lisp
 
 script:
-  - "ros -e '(when (uiop:getenvp \"READTABLE_CASE_INVERT\")
-               (format t \"changing readtable-case to :invert~%\")
-               (setq *readtable*
-                     (let ((rt (copy-readtable)))
-                       (setf (readtable-case rt) :invert)
-                       rt)))'
-         -e '(progn
-               (format t \"(lisp-implementation-type): ~A~%\" (lisp-implementation-type))
-               (format t \"(lisp-implementation-version): ~A~%\" (lisp-implementation-version))
-               (format t \"*features*: ~A~%\" *features*)
-               (format t \"(asdf:asdf-version): ~A~%\" (asdf:asdf-version)))'
-         -e '#+abcl
-             (progn
-                (format t \"Loading abcl-asdf and switching maven repo URL to HTTPS (see https://github.com/armedbear/abcl/issues/151)~%\")
-                (require :abcl-contrib)
-                (format t \"abcl-contrib loaded...~%\")
-                (require :abcl-asdf)
-                (format t \"abcl-asdf loaded...~%\")
-                (format t \"*features*: ~A~%\" *features*)
-                (setf (symbol-value (read-from-string \"abcl-asdf::*default-repository*\"))
-                      \"https://repo1.maven.org/maven2/\")
-                (format t \"abcl-asdf::*default-repository* assigned the HTTPS URL.~%\"))'
-         -e '(ql:quickload :cffi)'
-         -e '(format t \"cffi loaded.~%\")'
-         -e '(cffi:load-foreign-library \"test/run-on-many-lisps-and-openssls/openssl-releases/bin/'$OPENSSL-${BITS}bit'/lib/libcrypto.so\")'
-         -e '(format t \"libcrypto.so loaded.~%\")'
-         -e '(cffi:load-foreign-library \"test/run-on-many-lisps-and-openssls/openssl-releases/bin/'$OPENSSL-${BITS}bit'/lib/libssl.so\")'
-         -e '(format t \"libssl.so loaded.~%\")'
-         -e '(pushnew :cl+ssl-foreign-libs-already-loaded *features*)'
-         -e '(ql:quickload :cl+ssl) ;; load cl+ssl separately from cl+ssl.test only because cl+ssl.test can not be loaded in the :invert readtable-case due to its dependency ironclad, as of 2019-10-20'
-         -e '(format t \"cl+ssl loaded.~%\")'
-         -e '(when (uiop:getenvp \"READTABLE_CASE_INVERT\")
-               (format t \"restoring readtable-case to :upcase before loading cl+ssl.test~%\")
-               (setf (readtable-case *readtable*) :upcase))'
-         -e '(ql:quickload :cl+ssl.test)'
-         -e '(format t \"(cl+ssl::compat-openssl-version): ~A~%\" (cl+ssl::compat-openssl-version))'
-         -e '(let ((results
-                  #+ sbcl
-                  (coveralls:with-coveralls (:exclude \"test\")
-                     (5am:run :cl+ssl))
-                  #- sbcl
-                  (5am:run :cl+ssl)
-                  ))
-              (5am:explain! results)
-              #+abcl
-              (let* ((expected-failures (quote (cl+ssl.test::wrong.host
-                                                cl+ssl.test::expired
-                                                cl+ssl.test::fingerprint-google-cert)))
-                     (failed-test-names (mapcar (lambda (result)
-                                                  (5am::name (5am::test-case result)))
-                                                (remove-if-not (quote 5am::test-failure-p)
-                                                               results))))
-                (if (set-exclusive-or expected-failures
-                                      failed-test-names)
-                    (progn
-                      (format t \"~%ABCL: expected faileres on Travis CI: ~S, actual failures: ~S~%\"
-                              expected-failures
-                              failed-test-names)
-                      (uiop:quit 1))
-                    (format t \"ABCL failed some tests as expected on Travis CI: ~S~%\"
-                            expected-failures)))
-              #-abcl
-              (unless (5am:results-status results)
-                (uiop:quit 1)))'"
+  - LIB_LOAD_MODE=new ./.travis-run-tests.sh
+  - |
+    if [ "$LISP" != "abcl" ]
+    then
+      ls ~/.cache/common-lisp/
+      rm -rf ~/.cache/common-lisp/
+      LIB_LOAD_MODE=old ./.travis-run-tests.sh
+    fi

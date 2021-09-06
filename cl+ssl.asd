@@ -1,4 +1,4 @@
-;;; -*- mode: lisp -*-
+;;;; -*- Mode: LISP; Syntax: COMMON-LISP; indent-tabs-mode: nil; coding: utf-8; show-trailing-whitespace: t -*-
 ;;;
 ;;; Copyright (C) 2001, 2003  Eric Marsden
 ;;; Copyright (C) 2005  David Lichteblau
@@ -16,7 +16,8 @@
   :description "Common Lisp interface to OpenSSL."
   :license "MIT"
   :author "Eric Marsden, Jochen Schmidt, David Lichteblau"
-  :depends-on (:cffi :trivial-gray-streams :flexi-streams #+sbcl :sb-posix
+  :depends-on (:cl+ssl/config
+               :cffi :trivial-gray-streams :flexi-streams #+sbcl :sb-posix
                #+(and sbcl win32) :sb-bsd-sockets
                :bordeaux-threads :trivial-garbage :uiop
                :usocket
@@ -29,12 +30,18 @@
                  (:file "reload")
                  (:file "conditions")
                  (:file "ffi")
-                 (:file "x509")
                  (:file "ffi-buffer-all")
                  #-clisp (:file "ffi-buffer")
                  #+clisp (:file "ffi-buffer-clisp")
                  (:file "streams")
                  (:file "bio")
+                 (:file "x509")
                  (:file "random")
                  (:file "context")
                  (:file "verify-hostname")))))
+
+(defsystem :cl+ssl/config
+  :depends-on (:cffi)
+  :components ((:module "src"
+                :serial t
+                :components ((:file "config")))))

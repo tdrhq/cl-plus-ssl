@@ -112,8 +112,8 @@
 
 (defmethod stream-read-byte ((stream ssl-stream))
   (or (prog1
-         (ssl-stream-peeked-byte stream)
-       (setf (ssl-stream-peeked-byte stream) nil))
+          (ssl-stream-peeked-byte stream)
+        (setf (ssl-stream-peeked-byte stream) nil))
       (handler-case
           (let ((buf (ssl-stream-input-buffer stream))
                 (handle (ssl-stream-handle stream)))
@@ -132,18 +132,18 @@
   (let ((buf (ssl-stream-input-buffer stream))
         (handle (ssl-stream-handle stream)))
     (loop
-        for length = (min (- end start) (buffer-length buf))
-        while (plusp length)
-        do
-          (handler-case
-              (let ((read-bytes
-                      (with-pointer-to-vector-data (ptr buf)
-                        (ensure-ssl-funcall
-                         stream handle #'ssl-read handle ptr length))))
-                (s/b-replace seq buf :start1 start :end1 (+ start read-bytes))
-                (incf start read-bytes))
-            (ssl-error-zero-return ()   ;SSL_read returns 0 on end-of-file
-              (return))))
+       for length = (min (- end start) (buffer-length buf))
+       while (plusp length)
+       do
+         (handler-case
+             (let ((read-bytes
+                    (with-pointer-to-vector-data (ptr buf)
+                      (ensure-ssl-funcall
+                       stream handle #'ssl-read handle ptr length))))
+               (s/b-replace seq buf :start1 start :end1 (+ start read-bytes))
+               (incf start read-bytes))
+           (ssl-error-zero-return ()   ;SSL_read returns 0 on end-of-file
+             (return))))
     ;; fixme: kein out-of-file wenn (zerop start)?
     start))
 
@@ -182,7 +182,7 @@
         (handle (ssl-stream-handle stream)))
     (when (plusp fill-ptr)
       (unless handle
-  (error "output operation on closed SSL stream"))
+        (error "output operation on closed SSL stream"))
       (with-pointer-to-vector-data (ptr buf)
         (ensure-ssl-funcall stream handle #'ssl-write handle ptr fill-ptr))
       (setf (ssl-stream-output-pointer stream) 0))))
@@ -190,19 +190,20 @@
 #+(and clozure-common-lisp (not windows))
 (defun install-nonblock-flag (fd)
   (ccl::fd-set-flags fd (logior (ccl::fd-get-flags fd)
-                     #.(read-from-string "#$O_NONBLOCK"))))
-                     ;; read-from-string is necessary because
-                     ;; CLISP and perhaps other Lisps are confused
-                     ;; by #$, signaling"undefined dispatch character $",
-                     ;; even though the defun in conditionalized by
-                     ;; #+clozure-common-lisp
+                                ;; read-from-string is necessary because
+                                ;; CLISP and perhaps other Lisps are confused
+                                ;; by #$, signaling
+                                ;; "undefined dispatch character $",
+                                ;; even though the defun in conditionalized by
+                                ;; #+clozure-common-lisp
+                                #.(read-from-string "#$O_NONBLOCK"))))
 
 #+(and sbcl (not win32))
 (defun install-nonblock-flag (fd)
   (sb-posix:fcntl fd
-      sb-posix::f-setfl
-      (logior (sb-posix:fcntl fd sb-posix::f-getfl)
-        sb-posix::o-nonblock)))
+                  sb-posix::f-setfl
+                  (logior (sb-posix:fcntl fd sb-posix::f-getfl)
+                          sb-posix::o-nonblock)))
 
 #-(or (and clozure-common-lisp (not windows)) sbcl)
 (defun install-nonblock-flag (fd)
@@ -216,12 +217,16 @@
 ;;; interface functions
 ;;;
 
+(defvar *default-unwrap-stream-p* t
+  "Default value for UNWRAP-STREAM-P parameter.
+If true (the default), give OpenSSL the file descriptor of the stream, instead of a Lisp BIO.")
+
 (defun install-handle-and-bio (stream handle socket unwrap-stream-p)
   (setf (ssl-stream-handle stream) handle)
   (when unwrap-stream-p
     (let ((fd (stream-fd socket)))
       (when fd
-  (setf socket fd))))
+        (setf socket fd))))
   (etypecase socket
     (integer
      (install-nonblock-flag socket)
@@ -255,14 +260,14 @@
 (defun install-key-and-cert (handle key certificate)
   (when certificate
     (unless (eql 1 (ssl-use-certificate-file handle
-               certificate
-               +ssl-filetype-pem+))
+                                             certificate
+                                             +ssl-filetype-pem+))
       (error 'ssl-error-initialize
-       :reason (format nil "Can't load certificate ~A" certificate))))
+             :reason (format nil "Can't load certificate ~A" certificate))))
   (when key
     (unless (eql 1 (ssl-use-privatekey-file handle
-            key
-            +ssl-filetype-pem+))
+                                            key
+                                            +ssl-filetype-pem+))
       (error 'ssl-error-initialize :reason (format nil "Can't load private key file ~A" key)))))
 
 (defun x509-certificate-names (x509-certificate)
@@ -322,7 +327,7 @@ If CHECK-VERIFY-P is true, signal connection errors if the server certificate do
 (defun ssl-verify-init (&key
                         (verify-depth nil)
                         (verify-locations nil))
-"DEPRECATED.
+  "DEPRECATED.
 Use the (MAKE-SSL-CLIENT-STREAM .. :VERIFY ?) to enable/disable verification.
 Use (MAKE-CONTEXT ... :VERIFY-LOCATION ? :VERIFY-DEPTH ?) to control the verification depth and locations.
 MAKE-CONTEXT also allows to enab/disable verification."
@@ -360,8 +365,8 @@ MAKE-CONTEXT also allows to enab/disable verification."
                         ;; TODO: refactor verify-hostname to simplify this protocol.
                         (not (verify-hostname srv-cert hostname)))
                (error 'ssl-unable-to-match-host-name :hostname hostname))))
-        (unless (cffi:null-pointer-p srv-cert)
-          (x509-free srv-cert)))))
+      (unless (cffi:null-pointer-p srv-cert)
+        (x509-free srv-cert)))))
 
 (defun handle-external-format (stream ef)
   (if ef
@@ -396,7 +401,7 @@ Change this variable if you want the previous behaviour.")
 ;; fixme: free the context when errors happen in this function
 (defun make-ssl-client-stream
     (socket &key certificate key password method external-format
-              close-callback (unwrap-stream-p t)
+              close-callback (unwrap-stream-p *default-unwrap-stream-p*)
               (cipher-list *default-cipher-list*)
               (verify (if (ssl-check-verify-p)
                           :optional
@@ -443,7 +448,7 @@ hostname verification if verification is enabled by VERIFY."
 ;; fixme: free the context when errors happen in this function
 (defun make-ssl-server-stream
     (socket &key certificate key password method external-format
-                 close-callback (unwrap-stream-p t)
+                 close-callback (unwrap-stream-p *default-unwrap-stream-p*)
                  (cipher-list *default-cipher-list*)
                  (buffer-size *default-buffer-size*)
                  (input-buffer-size buffer-size)
@@ -531,8 +536,9 @@ may be associated with the passphrase PASSWORD."
            (jvm-version ()
              (read
               (make-string-input-stream
-               (java:jstatic "getProperty" "java.lang.System"
-                                          "java.specification.version")))))
+               (java:jstatic "getProperty"
+                             "java.lang.System"
+                             "java.specification.version")))))
       (ignore-errors
        (get-java-fields (java:jcall "getWrappedInputStream"  ;; TODO: define this as a constant
                                     (two-way-stream-input-stream stream))
